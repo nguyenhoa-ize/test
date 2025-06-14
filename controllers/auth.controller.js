@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
 const admin = require("../config/firebaseAdmin");
+const { getIO } = require("../socket");
 
 // Xác thực Firebase ID Token
 const verifyFirebaseToken = async (idToken) => {
@@ -34,6 +35,7 @@ async function checkUserInfo(userId) {
 
 exports.googleLogin = async (req, res) => {
   const authHeader = req.headers.authorization;
+  getIO();
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Không có token hoặc định dạng sai" });

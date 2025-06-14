@@ -88,6 +88,8 @@ function init(server) {
       }
     });
   });
+
+  getIO();
 }
 
 function getIO() {

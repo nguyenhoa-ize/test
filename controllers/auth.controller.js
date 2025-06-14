@@ -216,7 +216,7 @@ exports.login = async (req, res) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "Strict",
+      sameSite: "None",
       maxAge: 15 * 24 * 60 * 60 * 1000, // 15 ngày
       path: "/", // Đặt path để cookie có thể truy cập từ mọi route
     });
@@ -284,7 +284,7 @@ exports.signup = async (req, res) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "Strict",
+      sameSite: "None",
       maxAge: 15 * 24 * 60 * 60 * 1000, // 15 ngày
       path: "/", // Đặt path để cookie có thể truy cập từ mọi route
     });

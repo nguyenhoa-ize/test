@@ -30,6 +30,7 @@ function init(server) {
       // Gửi broadcast về user online
       onlineUsers.add(userId);
       io.emit('onlineUsers', Array.from(onlineUsers));
+      console.log('user connected: ', userId);
     });
 
     socket.on('joinConversation', async ({ userId, conversationId }) => {
@@ -91,6 +92,7 @@ function init(server) {
 
 function getIO() {
   if (!io) throw new Error('Socket.io not initialized');
+  console.log('Đã lấy được socket.io instance');
   return io;
 }
 

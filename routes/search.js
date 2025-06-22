@@ -8,12 +8,12 @@ router.get('/search-suggestions', async (req, res) => {
   if (!query) return res.json([]);
 
   try {
-    // Lấy user
+    // Lấy user có avatar
     const users = await pool.query(
-      "SELECT id, (first_name || ' ' || last_name) AS name, avatar_url AS avatar, 'user' AS type FROM users WHERE first_name IS NOT NULL AND last_name IS NOT NULL AND unaccent(LOWER(first_name || ' ' || last_name)) LIKE unaccent($1) LIMIT 5",
+      "SELECT id, (first_name || ' ' || last_name) AS name, avatar_url AS avatar, 'user' AS type FROM users WHERE first_name IS NOT NULL AND last_name IS NOT NULL AND avatar_url IS NOT NULL AND avatar_url <> '' AND unaccent(LOWER(first_name || ' ' || last_name)) LIKE unaccent($1) LIMIT 5",
       [`%${query}%`]
     );
-    // Lấy post
+    // Lấy post liên quan
     const posts = await pool.query(
       `SELECT 
         p.id, 

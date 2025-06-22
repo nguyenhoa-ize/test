@@ -10,7 +10,6 @@
     "keywords": [],
     "author": "",
     "license": "ISC",
-    "description": "",
     "dependencies": {
         "@supabase/supabase-js": "^2.49.8",
         "bcrypt": "^6.0.0",
@@ -25,12 +24,15 @@
         "jsonwebtoken": "^9.0.2",
         "multer": "^2.0.0",
         "nodemailer": "^7.0.3",
-        "pg": "^8.15.6",
+        "pg": "^8.16.2",
         "react-toastify": "^11.0.5",
+        "react-window": "^1.8.11",
         "socket.io": "^4.8.1",
-        "streamsearch": "^1.1.0"
+        "streamsearch": "^1.1.0",
+        "winston": "^3.17.0"
     },
     "devDependencies": {
         "nodemon": "^3.1.10"
-    }
+    },
+    "description": ""
 }

@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../db');
+const { createLikeNotification } = require('../utils/notification');
 const router = express.Router();
 
 // Like post
@@ -7,13 +8,31 @@ router.post('/like', async (req, res) => {
   const { post_id, user_id } = req.body;
   if (!post_id || !user_id) return res.status(400).json({ error: 'Thiếu post_id hoặc user_id' });
 
-  // Kiểm tra đã like chưa
-  const check = await pool.query('SELECT * FROM post_likes WHERE post_id=$1 AND user_id=$2', [post_id, user_id]);
-  if (check.rows.length > 0) return res.status(400).json({ error: 'Đã like rồi' });
+  try {
+    // Kiểm tra đã like chưa
+    const check = await pool.query('SELECT * FROM post_likes WHERE post_id=$1 AND user_id=$2', [post_id, user_id]);
+    if (check.rows.length > 0) return res.status(400).json({ error: 'Đã like rồi' });
 
-  await pool.query('INSERT INTO post_likes (post_id, user_id, created_at) VALUES ($1, $2, NOW())', [post_id, user_id]);
-  await pool.query('UPDATE posts SET like_count = like_count + 1 WHERE id = $1', [post_id]);
-  res.json({ success: true });
+    await pool.query('INSERT INTO post_likes (post_id, user_id, created_at) VALUES ($1, $2, NOW())', [post_id, user_id]);
+    await pool.query('UPDATE posts SET like_count = like_count + 1 WHERE id = $1', [post_id]);
+
+    // Lấy thông tin bài viết để biết chủ bài viết là ai
+    const postResult = await pool.query('SELECT user_id FROM posts WHERE id = $1', [post_id]);
+    const postAuthorId = postResult.rows[0]?.user_id;
+
+    if (postAuthorId && postAuthorId !== user_id) {
+      await createLikeNotification(
+        post_id,      
+        user_id,
+        postAuthorId
+      );
+    }
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error liking post:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
 });
 
 // Unlike post

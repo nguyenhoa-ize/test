@@ -1,5 +1,5 @@
 const { query, pool, transaction } = require('../db');
-const { getIO, userSockets } = require('../socket');
+const { getIO, isUserInRoom } = require('../socket');
 
 
 const getUnreadTotal = async (userId) => {
@@ -16,8 +16,11 @@ const processConversationRow = (row) => {
   const updatedAt = row.updated_at?.toISOString() || lastMessageAt;
 
   let lastMessage = '';
-  if (row.last_message_image_url) lastMessage = '[Đã gửi một ảnh]';
-  else if (row.last_message_content) lastMessage = row.last_message_content;
+  if (row.last_message_image_urls && row.last_message_image_urls.length > 0) {
+    lastMessage = '[Đã gửi một ảnh]';
+  } else if (row.last_message_content) {
+    lastMessage = row.last_message_content;
+  }
 
   const conversation = {
     id: row.id,
@@ -142,7 +145,7 @@ exports.getAllConversations = async (req, res) => {
         c.avatar_group,
         c.last_message_at,
         m.content AS last_message_content,
-        m.image_url AS last_message_image_url,
+        m.image_url AS last_message_image_urls,
         cm.unread_count,
         u.id AS other_user_id,
         u.first_name AS other_user_first_name,
@@ -180,7 +183,18 @@ exports.getAllConversations = async (req, res) => {
     `;
     const { rows } = await pool.query(conversationsQuery, [userId, search, limit, offset]);
 
-    const conversations = rows.map(processConversationRow);
+    const processedRows = rows.map(row => {
+      if (typeof row.last_message_image_urls === 'string') {
+        try {
+          row.last_message_image_urls = JSON.parse(row.last_message_image_urls);
+        } catch (e) {
+          row.last_message_image_urls = [row.last_message_image_urls];
+        }
+      }
+      return row;
+    });
+
+    const conversations = processedRows.map(processConversationRow);
     return res.status(200).json({
       conversations,
       total: parseInt(count),
@@ -226,7 +240,25 @@ exports.getMessages = async (req, res) => {
       LIMIT $2 OFFSET $3
     `, [conversationId, limit, offset]);
 
-    res.json(messages.rows);
+    // Parse image_url from JSON string to array
+    const processedMessages = messages.rows.map(msg => {
+      if (typeof msg.image_url === 'string') {
+        try {
+          // Attempt to parse it as JSON. If it's just a plain string URL, wrap it in an array.
+          const parsed = JSON.parse(msg.image_url);
+          msg.image_urls = Array.isArray(parsed) ? parsed : [msg.image_url];
+        } catch (e) {
+          // If parsing fails, it's likely a single URL string.
+          msg.image_urls = [msg.image_url];
+        }
+      } else {
+        msg.image_urls = [];
+      }
+      delete msg.image_url; // Clean up old field
+      return msg;
+    });
+
+    res.json(processedMessages);
   } catch (error) {
     console.error('Error getting messages:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -398,11 +430,22 @@ exports.createConversation = async (req, res) => {
 exports.sendMessage = async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const { content, type = 'text', imageUrl, replyToMessageId } = req.body;
+    const { content, type = 'text', imageUrl, imageUrls, replyToMessageId } = req.body;
     const userId = req.user.id;
 
+    let finalImageUrls = [];
+    if (imageUrls && Array.isArray(imageUrls)) {
+      finalImageUrls = imageUrls;
+    } else if (imageUrl) {
+      finalImageUrls = [imageUrl];
+    }
+    
+    // Store as JSON string if not empty, otherwise null
+    const imageUrlsJson = finalImageUrls.length > 0 ? JSON.stringify(finalImageUrls) : null;
+    const messageType = finalImageUrls.length > 0 ? 'image' : type;
+
     const message = await transaction(async (client) => {
-      // 1. Xác minh quyền
+      // Xác minh quyền
       const { rowCount } = await client.query(
         'SELECT 1 FROM conversation_members WHERE conversation_id = $1 AND user_id = $2',
         [conversationId, userId]
@@ -411,20 +454,20 @@ exports.sendMessage = async (req, res) => {
         throw { status: 403, message: 'Not authorized to send messages in this conversation' };
       }
 
-      // 2. Chèn tin nhắn
+      // Chèn tin nhắn
       const msgInsertRes = await client.query(`
         INSERT INTO messages (conversation_id, sender_id, content, type, image_url, reply_to_message_id)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id, created_at
-      `, [conversationId, userId, content, type, imageUrl, replyToMessageId]);
+      `, [conversationId, userId, content, messageType, imageUrlsJson, replyToMessageId]);
       const { id: messageId, created_at } = msgInsertRes.rows[0];
 
-      // 3. Cập nhật thời gian tin nhắn cuối cùng
+      // Cập nhật thời gian tin nhắn cuối cùng
       await client.query(`
         UPDATE conversations SET last_message_at = $1, updated_at = $1, last_message_id = $2 WHERE id = $3
       `, [created_at, messageId, conversationId]);
 
-      // 4. Lấy thông tin đầy đủ của tin nhắn
+      // Lấy thông tin đầy đủ của tin nhắn
       const result = await client.query(`
         SELECT 
           m.*, 
@@ -439,54 +482,58 @@ exports.sendMessage = async (req, res) => {
         WHERE m.id = $1
       `, [messageId]);
 
-      return result.rows[0];
+      const dbMessage = result.rows[0];
+      
+      // Parse image_url before sending back
+      if (typeof dbMessage.image_url === 'string') {
+        try {
+          dbMessage.image_urls = JSON.parse(dbMessage.image_url);
+        } catch {
+          dbMessage.image_urls = [dbMessage.image_url];
+        }
+      } else {
+        dbMessage.image_urls = [];
+      }
+      delete dbMessage.image_url;
+      
+      return dbMessage;
     });
 
-    // 5. Gửi message về client
     res.status(201).json(message);
 
-    // 6. Emit real-time
+    // Emit real-time
     const io = getIO();
     io.to(conversationId).emit('newMessage', message);
 
-    // 7. Lấy thành viên trừ người gửi
+    // Lấy conversation members
     const membersRes = await pool.query(
       'SELECT user_id FROM conversation_members WHERE conversation_id = $1 AND user_id != $2',
       [conversationId, userId]
     );
-    const targetUsers = membersRes.rows.map(row => row.user_id);
+    const targetUsers = membersRes.rows.map((row) => row.user_id);
 
-    // 8. Danh sách socket đang trong phòng
-    const socketsInRoom = await io.in(conversationId).allSockets();
-    const socketsById = new Map();
-    socketsInRoom.forEach(socketId => {
-      const socket = io.sockets.sockets.get(socketId);
-      if (socket?.userId) socketsById.set(socket.userId, true);
-    });
+    // Cập nhật tin nhắn chưa được và gửi thông báo đến user không ở trong phòng
+    await Promise.all(
+      targetUsers.map(async (targetUserId) => {
+        const isUserInRoomResult = await isUserInRoom(targetUserId, conversationId);
 
-    // 9. Xử lý unread counts và gửi updates
-    await Promise.all(targetUsers.map(async targetUserId => {
-      const isUserInRoom = socketsById.has(targetUserId);
-      
-      if (!isUserInRoom) {
-        // Tăng unread count
-        await pool.query(`
-          UPDATE conversation_members 
-          SET unread_count = unread_count + 1 
-          WHERE user_id = $1 AND conversation_id = $2
-        `, [targetUserId, conversationId]);
+        if (!isUserInRoomResult) {
+          // Tăng tin nhắn chưa đọc
+          await pool.query(
+            `UPDATE conversation_members 
+             SET unread_count = unread_count + 1 
+             WHERE user_id = $1 AND conversation_id = $2`,
+            [targetUserId, conversationId]
+          );
 
-        // Lấy tổng số unread mới
-        const totalUnread = await getUnreadTotal(targetUserId);
+          const totalUnread = await getUnreadTotal(targetUserId);
 
-        // Gửi update cho tất cả socket của user
-        const sockets = userSockets[targetUserId] || [];
-        sockets.forEach(socketId => {
-          io.to(socketId).emit('newMessage', message);
-          io.to(socketId).emit('unreadTotalUpdated', { total: totalUnread });
-        });
-      }
-    }));
+          // Emit newMessage và unreadTotalUpdated đến user
+          io.to(`user:${targetUserId}`).emit('newMessage', message);
+          io.to(`user:${targetUserId}`).emit('unreadTotalUpdated', { total: totalUnread });
+        }
+      })
+    );
 
   } catch (error) {
     if (error.status === 403) {

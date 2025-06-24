@@ -7,7 +7,7 @@ const { getIO } = require('../socket');
 // Lấy danh sách báo cáo
 router.get('/', async (req, res) => {
   try {
-    const { search, status } = req.query;
+    const { search, status, offset = 0, limit = 10 } = req.query;
     let query = `
       SELECT 
         r.id,
@@ -35,20 +35,42 @@ router.get('/', async (req, res) => {
     if (search) {
       where.push(`(
         LOWER(u1.first_name) LIKE $${params.length + 1} OR
-        LOWER(u1.last_name) LIKE $${params.length + 1} OR
-        LOWER(u2.first_name) LIKE $${params.length + 1} OR
-        LOWER(u2.last_name) LIKE $${params.length + 1}
+        LOWER(u1.last_name) LIKE $${params.length + 2} OR
+        LOWER(u2.first_name) LIKE $${params.length + 3} OR
+        LOWER(u2.last_name) LIKE $${params.length + 4}
       )`);
-      params.push(`%${search.toLowerCase()}%`);
+      const searchValue = `%${search.toLowerCase()}%`;
+      params.push(searchValue, searchValue, searchValue, searchValue);
     }
     if (where.length > 0) {
       query += ' WHERE ' + where.join(' AND ');
     }
-    query += ' ORDER BY r.created_at DESC;';
-    const { rows } = await pool.query(query, params);
+    // Query lấy tổng số báo cáo (không phân trang)
+    let countQuery = `
+      SELECT COUNT(*) FROM reports r
+      LEFT JOIN users u1 ON r.reporter_id = u1.id
+      LEFT JOIN users u2 ON r.reported_user_id = u2.id
+    `;
+    if (where.length > 0) {
+      countQuery += ' WHERE ' + where.join(' AND ');
+    }
+    const countResult = await pool.query(countQuery, params);
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    query += ' ORDER BY r.created_at DESC';
+    // Xác định vị trí offset/limit trong params
+    let mainParams;
+    if (params.length > 0) {
+      query += ` OFFSET $${params.length + 1} LIMIT $${params.length + 2}`;
+      mainParams = [...params, parseInt(offset, 10), parseInt(limit, 10)];
+    } else {
+      query += ` OFFSET $1 LIMIT $2`;
+      mainParams = [parseInt(offset, 10), parseInt(limit, 10)];
+    }
+    const { rows } = await pool.query(query, mainParams);
 
     const reports = rows.map((report, index) => ({
-      stt: index + 1,
+      stt: (parseInt(offset, 10) || 0) + index + 1,
       report_id: report.id,
       reporter_id: report.reporter_id,
       reported_user_id: report.reported_user_id,
@@ -59,7 +81,7 @@ router.get('/', async (req, res) => {
       status: report.status === 'pending' ? 'Chưa xử lý' : 'Đã xử lý',
     }));
 
-    res.status(200).json({ success: true, reports });
+    res.status(200).json({ success: true, items: reports, total });
   } catch (err) {
     console.error('Get reports error:', err);
     res.status(500).json({ error: 'Lỗi server', detail: err.message });

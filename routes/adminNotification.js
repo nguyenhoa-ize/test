@@ -8,7 +8,7 @@ router.get('/notifications', isAuthenticated, async (req, res) => {
   try {
     const userId = req.user.id;
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
+    const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
     const tab = req.query.tab || 'all';
 
@@ -115,6 +115,21 @@ router.post('/notifications/read-all', isAuthenticated, async (req, res) => {
   }
 });
 
+// Xóa tất cả thông báo admin
+router.delete('/notifications/all', isAuthenticated, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    await pool.query(
+      `DELETE FROM notifications WHERE user_id = $1 AND (type = 'report_new' OR type = 'post_approval')`,
+      [userId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Lỗi xóa tất cả thông báo:', err);
+    res.status(500).json({ error: 'Lỗi server', detail: err.message });
+  }
+});
+
 // Xóa 1 thông báo admin
 router.delete('/notifications/:id', isAuthenticated, async (req, res) => {
   try {
@@ -127,21 +142,6 @@ router.delete('/notifications/:id', isAuthenticated, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Lỗi xóa thông báo:', err);
-    res.status(500).json({ error: 'Lỗi server', detail: err.message });
-  }
-});
-
-// Xóa tất cả thông báo admin
-router.delete('/notifications/all', isAuthenticated, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    await pool.query(
-      `DELETE FROM notifications WHERE user_id = $1 AND (type = 'report_new' OR type = 'post_approval')`,
-      [userId]
-    );
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Lỗi xóa tất cả thông báo:', err);
     res.status(500).json({ error: 'Lỗi server', detail: err.message });
   }
 });

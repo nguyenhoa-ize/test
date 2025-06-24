@@ -128,7 +128,9 @@ router.get("/search", isAuthenticated, async (req, res) => {
 
 // GET /api/users?status=Hoạt động&search=Nguyễn
 router.get("/", async (req, res) => {
-    const { status, search } = req.query;
+    const { status, search, offset = 0, limit = 10 } = req.query;
+    const parsedOffset = Math.max(parseInt(offset, 10) || 0, 0);
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
 
     try {
         let baseQuery = `
@@ -166,10 +168,23 @@ router.get("/", async (req, res) => {
         baseQuery += `
       GROUP BY u.id, ui.is_active, ui.created_at
       ORDER BY u.first_name, u.last_name
+      OFFSET $${values.length + 1} LIMIT $${values.length + 2}
     `;
 
+        values.push(parsedOffset, parsedLimit);
+
+        // Query for paginated users
         const result = await pool.query(baseQuery, values);
-        res.json(result.rows);
+
+        // Query for total count (không phân trang)
+        let countQuery = `SELECT COUNT(*) FROM users u JOIN user_info ui ON u.id = ui.id`;
+        if (conditions.length > 0) {
+            countQuery += ` WHERE ` + conditions.join(" AND ");
+        }
+        const countResult = await pool.query(countQuery, values.slice(0, -2));
+        const total = parseInt(countResult.rows[0].count, 10);
+
+        res.json({ users: result.rows, total });
     } catch (error) {
         console.error("Lỗi khi lấy danh sách người dùng:", error);
         res.status(500).json({ error: error.message });
@@ -212,6 +227,22 @@ router.put("/:id", async (req, res) => {
         res.json({ success: true, user: updatedUser.rows[0] });
     } catch (error) {
         console.error("Lỗi khi cập nhật thông tin người dùng:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PUT /api/users/:id/role
+router.put('/:id/role', async (req, res) => {
+    const { id } = req.params;
+    const { role } = req.body;
+    if (!['admin', 'user'].includes(role)) {
+        return res.status(400).json({ error: 'Role không hợp lệ' });
+    }
+    try {
+        await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, id]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Lỗi khi cập nhật role:', error);
         res.status(500).json({ error: error.message });
     }
 });

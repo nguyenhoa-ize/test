@@ -5,22 +5,40 @@ const router = express.Router();
 // Lấy danh sách từ cấm
 router.get('/', async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, offset = 0, limit = 10 } = req.query;
     let query = 'SELECT id, word, added_at FROM forbidden_words';
     let params = [];
     if (search) {
       query += ' WHERE LOWER(word) LIKE $1';
       params.push(`%${search.toLowerCase()}%`);
     }
-    query += ' ORDER BY added_at DESC;';
+    // Query lấy tổng số từ cấm (không phân trang)
+    let countQuery = 'SELECT COUNT(*) FROM forbidden_words';
+    let countParams = [];
+    if (search) {
+      countQuery += ' WHERE LOWER(word) LIKE $1';
+      countParams.push(`%${search.toLowerCase()}%`);
+    }
+    const countResult = await pool.query(countQuery, countParams);
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    query += ' ORDER BY added_at DESC';
+    // Sửa lỗi OFFSET/LIMIT
+    if (search) {
+      query += ' OFFSET $2 LIMIT $3';
+      params.push(parseInt(offset, 10), parseInt(limit, 10));
+    } else {
+      query += ' OFFSET $1 LIMIT $2';
+      params.push(parseInt(offset, 10), parseInt(limit, 10));
+    }
     const { rows } = await pool.query(query, params);
-    const forbiddenWords = rows.map((fw, index) => ({
-      stt: index + 1,
+    const forbiddenWords = (rows || []).map((fw, index) => ({
+      stt: offset * 1 + index + 1,
       id: fw.id,
       word: fw.word,
       added_at: fw.added_at ? new Date(fw.added_at).toLocaleDateString('en-CA') : '',
     }));
-    res.json({ success: true, forbiddenWords });
+    res.json({ success: true, items: forbiddenWords, total });
   } catch (err) {
     console.error('Get forbidden words error:', err);
      res.status(500).json({ success: false, message: 'Lỗi server', detail: err.message });

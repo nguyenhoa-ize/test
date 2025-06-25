@@ -32,6 +32,8 @@ const corsOrigins = (process.env.CORS_ORIGINS || '')
     .map(s => s.trim())
     .filter(Boolean);
 
+console.log("iiiii: ", corsOrigins);
+
 app.use(
     cors({
         origin: corsOrigins,

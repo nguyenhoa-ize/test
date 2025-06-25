@@ -1,5 +1,6 @@
 const { query, pool, transaction } = require('../db');
 const { getIO, isUserInRoom } = require('../socket');
+const { encryptMessage, decryptMessage } = require('../utils/encryption');
 
 
 const getUnreadTotal = async (userId) => {
@@ -19,7 +20,13 @@ const processConversationRow = (row) => {
   if (row.last_message_image_urls && row.last_message_image_urls.length > 0) {
     lastMessage = '[Đã gửi một ảnh]';
   } else if (row.last_message_content) {
-    lastMessage = row.last_message_content;
+    try {
+      // Giải mã nội dung tin nhắn cuối cùng
+      lastMessage = decryptMessage(row.last_message_content);
+    } catch (error) {
+      // Nếu giải mã thất bại, hiển thị nội dung gốc
+      lastMessage = row.last_message_content;
+    }
   }
 
   const conversation = {
@@ -128,10 +135,7 @@ exports.getAllConversations = async (req, res) => {
       ) u ON true
       WHERE $2::text IS NULL OR (
         c.type = 'group' AND LOWER(c.name) LIKE $2::text
-        OR c.type = 'direct' AND (
-          LOWER(u.first_name || ' ' || u.last_name) LIKE $2::text
-          OR LOWER(m.content) LIKE $2::text
-        )
+        OR c.type = 'direct' AND LOWER(u.first_name || ' ' || u.last_name) LIKE $2::text
       )
     `;
     const { rows: [{ count }] } = await pool.query(countQuery, [userId, search]);
@@ -173,10 +177,7 @@ exports.getAllConversations = async (req, res) => {
       ) u ON true
       WHERE $2::text IS NULL OR (
         c.type = 'group' AND LOWER(c.name) LIKE $2::text
-        OR c.type = 'direct' AND (
-          LOWER(u.first_name || ' ' || u.last_name) LIKE $2::text
-          OR LOWER(m.content) LIKE $2::text
-        )
+        OR c.type = 'direct' AND LOWER(u.first_name || ' ' || u.last_name) LIKE $2::text
       )
       ORDER BY GREATEST(c.last_message_at, c.updated_at) DESC NULLS LAST
       LIMIT $3 OFFSET $4
@@ -242,6 +243,17 @@ exports.getMessages = async (req, res) => {
 
     // Parse image_url from JSON string to array
     const processedMessages = messages.rows.map(msg => {
+      if (msg.content) {
+        try {
+          msg.content = decryptMessage(msg.content);
+        } catch {}
+      }
+      // Giải mã nội dung reply nếu có
+      if (msg.reply_to_content) {
+        try {
+          msg.reply_to_content = decryptMessage(msg.reply_to_content);
+        } catch {}
+      }
       if (typeof msg.image_url === 'string') {
         try {
           // Attempt to parse it as JSON. If it's just a plain string URL, wrap it in an array.
@@ -315,6 +327,16 @@ exports.createConversation = async (req, res) => {
         const detailRes = await pool.query(detailQuery, [userId, otherUserId, convoId]);
         const row = detailRes.rows[0];
 
+        // Giải mã last_message nếu có
+        let lastMessage = '';
+        if (row.last_message) {
+          try {
+            lastMessage = decryptMessage(row.last_message);
+          } catch (error) {
+            lastMessage = row.last_message;
+          }
+        }
+
         return res.status(200).json({
           conversation: {
             id: row.id,
@@ -322,7 +344,7 @@ exports.createConversation = async (req, res) => {
             type: row.type,
             last_message_at: row.last_message_at,
             updated_at: row.updated_at,
-            last_message: row.last_message || '',
+            last_message: lastMessage,
             avatar_group: null,
             other_user: {
               id: row.other_user_id,
@@ -454,12 +476,15 @@ exports.sendMessage = async (req, res) => {
         throw { status: 403, message: 'Not authorized to send messages in this conversation' };
       }
 
+      // Mã hóa content trước khi lưu
+      const encryptedContent = content ? encryptMessage(content) : '';
+
       // Chèn tin nhắn
       const msgInsertRes = await client.query(`
         INSERT INTO messages (conversation_id, sender_id, content, type, image_url, reply_to_message_id)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id, created_at
-      `, [conversationId, userId, content, messageType, imageUrlsJson, replyToMessageId]);
+      `, [conversationId, userId, encryptedContent, messageType, imageUrlsJson, replyToMessageId]);
       const { id: messageId, created_at } = msgInsertRes.rows[0];
 
       // Cập nhật thời gian tin nhắn cuối cùng
@@ -483,6 +508,20 @@ exports.sendMessage = async (req, res) => {
       `, [messageId]);
 
       const dbMessage = result.rows[0];
+      
+      // Khi trả về message, giải mã content
+      if (dbMessage.content) {
+        try {
+          dbMessage.content = decryptMessage(dbMessage.content);
+        } catch {}
+      }
+      
+      // Giải mã reply content nếu có
+      if (dbMessage.reply_to_content) {
+        try {
+          dbMessage.reply_to_content = decryptMessage(dbMessage.reply_to_content);
+        } catch {}
+      }
       
       // Parse image_url before sending back
       if (typeof dbMessage.image_url === 'string') {

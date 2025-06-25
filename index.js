@@ -29,9 +29,9 @@ dotenv.config();
 // CORS cấu hình rõ ràng
 app.use(
     cors({
-        origin: process.env.CORS_ORIGINS
-            ? process.env.CORS_ORIGINS.split(",")
-            : ["http://localhost:3000", "http://127.0.0.1:3000"],
+        origin: (process.env.CORS_ORIGINS
+            ? process.env.CORS_ORIGINS.split(",").map(s => s.trim())
+            : ["http://localhost:3000", "http://127.0.0.1:3000"]),
         credentials: true,
     })
 );

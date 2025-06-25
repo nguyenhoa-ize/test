@@ -121,7 +121,6 @@ router.get("/search", isAuthenticated, async (req, res) => {
             total,
         });
     } catch (error) {
-        console.error("Error fetching users:", error);
         res.status(500).json({ error: "Failed to fetch users" });
     }
 });
@@ -186,7 +185,6 @@ router.get("/", async (req, res) => {
 
         res.json({ users: result.rows, total });
     } catch (error) {
-        console.error("Lỗi khi lấy danh sách người dùng:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -203,7 +201,6 @@ router.put("/:id/status", async (req, res) => {
         ]);
         res.json({ success: true });
     } catch (error) {
-        console.error("Lỗi khi cập nhật trạng thái:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -226,23 +223,24 @@ router.put("/:id", async (req, res) => {
         );
         res.json({ success: true, user: updatedUser.rows[0] });
     } catch (error) {
-        console.error("Lỗi khi cập nhật thông tin người dùng:", error);
         res.status(500).json({ error: error.message });
     }
 });
 
 // PUT /api/users/:id/role
-router.put('/:id/role', async (req, res) => {
+router.put("/:id/role", async (req, res) => {
     const { id } = req.params;
     const { role } = req.body;
-    if (!['admin', 'user'].includes(role)) {
-        return res.status(400).json({ error: 'Role không hợp lệ' });
+    if (!["admin", "user"].includes(role)) {
+        return res.status(400).json({ error: "Role không hợp lệ" });
     }
     try {
-        await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, id]);
+        await pool.query("UPDATE users SET role = $1 WHERE id = $2", [
+            role,
+            id,
+        ]);
         res.json({ success: true });
     } catch (error) {
-        console.error('Lỗi khi cập nhật role:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -271,7 +269,6 @@ router.get("/:id/follow-stats", isAuthenticated, async (req, res) => {
 
         res.json(result.rows[0]);
     } catch (error) {
-        console.error("Error getting follow stats:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -298,7 +295,6 @@ router.get("/:id/followers", isAuthenticated, async (req, res) => {
 
         res.json(result.rows);
     } catch (error) {
-        console.error("Error getting followers:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -325,7 +321,6 @@ router.get("/:id/following", isAuthenticated, async (req, res) => {
 
         res.json(result.rows);
     } catch (error) {
-        console.error("Error getting following:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -388,7 +383,6 @@ router.post("/:id/follow", isAuthenticated, async (req, res) => {
         });
     } catch (error) {
         await pool.query("ROLLBACK");
-        console.error("Error following user:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -445,7 +439,6 @@ router.delete("/:id/follow", isAuthenticated, async (req, res) => {
         });
     } catch (error) {
         await pool.query("ROLLBACK");
-        console.error("Error unfollowing user:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -457,7 +450,7 @@ router.get("/:id", async (req, res) => {
     try {
         const result = await pool.query(
             `
-      SELECT u.id, u.first_name, u.last_name, u.email, u.avatar_url, ui.created_at
+      SELECT u.id, u.first_name, u.last_name, u.email, u.avatar_url, u.cover_url, u.bio, ui.created_at
       FROM users u
       JOIN user_info ui ON u.id = ui.id
       WHERE u.id = $1
@@ -471,7 +464,6 @@ router.get("/:id", async (req, res) => {
 
         res.json(result.rows[0]);
     } catch (error) {
-        console.error("Error fetching user:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -486,7 +478,6 @@ router.get("/:id/post-stats", isAuthenticated, async (req, res) => {
         );
         res.json({ total_posts: parseInt(result.rows[0].total_posts, 10) });
     } catch (error) {
-        console.error("Error getting post stats:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
@@ -511,7 +502,6 @@ router.get("/:id/friends", isAuthenticated, async (req, res) => {
         );
         res.json({ friends: result.rows });
     } catch (err) {
-        console.error("Lỗi khi lấy friends:", err);
         res.status(500).json({ error: "Server error" });
     }
 });

@@ -45,16 +45,12 @@ cloudinary.config({
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
-if (process.env.NODE_ENV !== "production") {
-    console.log("Cloudinary config:", cloudinary.config());
-}
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 router.post("/upload-media", upload.array("media", 9), async (req, res) => {
     try {
-        console.log("Uploading media:", req.files?.length, "files");
         const files = req.files || [];
         let mediaUrls = [];
         for (const file of files) {
@@ -72,7 +68,6 @@ router.post("/upload-media", upload.array("media", 9), async (req, res) => {
         }
         res.status(200).json({ images: mediaUrls });
     } catch (err) {
-        console.error("Upload media error:", err);
         res.status(500).json({
             error: "Tải ảnh thất bại",
             detail: err.message,
@@ -87,7 +82,6 @@ router.post("/", async (req, res) => {
                 .status(400)
                 .json({ error: "Missing or invalid request body" });
         }
-        console.log("Creating post:", req.body);
         const {
             content,
             privacy,
@@ -198,12 +192,10 @@ router.post("/", async (req, res) => {
             const io = getIO();
             io.to("admin_room").emit("newPost", { post: fullPost });
         } catch (e) {
-            console.error("Socket emit newPost error:", e);
         }
 
         res.status(201).json(fullPost);
     } catch (err) {
-        console.error("Post creation error:", err);
         res.status(500).json({
             error: "Đăng bài thất bại",
             detail: err.message,
@@ -265,7 +257,6 @@ router.get("/", async (req, res) => {
 
         res.json(posts);
     } catch (err) {
-        console.error("Get posts error:", err);
         res.status(500).json({
             error: "Không lấy được danh sách bài viết",
             detail: err.message,
@@ -290,7 +281,6 @@ router.get("/:id", async (req, res) => {
         const post = transformPost(rows[0]);
         res.json(post);
     } catch (err) {
-        console.error("Error fetching post:", err);
         res.status(500).json({ error: "Internal server error" });
     }
 });
@@ -343,7 +333,6 @@ router.get("/user/:userId", isAuthenticated, async (req, res) => {
         const posts = rows.map(transformPost);
         res.json(posts);
     } catch (error) {
-        console.error("Error fetching user posts:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });
@@ -378,7 +367,6 @@ router.get("/user/:userId/count", isAuthenticated, async (req, res) => {
             totalMedia: parseInt(stats.total_media) || 0,
         });
     } catch (error) {
-        console.error("Error fetching user post counts:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });
@@ -395,7 +383,6 @@ router.post("/increment-shares", async (req, res) => {
         );
         res.json({ success: true });
     } catch (err) {
-        console.error("Error incrementing shares:", err);
         res.status(500).json({ error: "Không tăng được số lượt chia sẻ" });
     }
 });

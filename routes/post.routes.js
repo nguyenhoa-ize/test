@@ -62,7 +62,6 @@ router.get('/', async (req, res) => {
     const result = await pool.query(query, values);
     res.json({ items: result.rows, total });
   } catch (err) {
-    console.error('Error fetching posts:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -106,7 +105,7 @@ router.put('/:id/approve', async (req, res) => {
       const io = getIO();
       // Đổi tên payload thành post để nhất quán
       io.emit('postApproved', { post: approvedPost });
-    } catch (e) { console.error('Socket emit postApproved error:', e); }
+    } catch (e) { }
     
     // Trả về luôn post đã được duyệt để client có thể dùng nếu cần
     res.json({ success: true, post: approvedPost });
@@ -125,7 +124,7 @@ router.delete('/:id', async (req, res) => {
     try {
         const io = getIO();
         io.emit('postDeleted', { postId: id });
-    } catch (e) { console.error('Socket emit postDeleted error:', e); }
+    } catch (e) { }
 
     res.json({ success: true });
   } catch (err) {

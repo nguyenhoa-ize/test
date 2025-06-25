@@ -3,12 +3,15 @@ const { pool } = require('./db');
 
 let io;
 
+const corsOrigins = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+
 function init(server) {
   io = new Server(server, {
     cors: {
-      origin: (process.env.CORS_ORIGINS
-        ? process.env.CORS_ORIGINS.split(",").map(s => s.trim())
-        : ["http://localhost:3000", "http://127.0.0.1:3000"]),
+      origin: corsOrigins,
       credentials: true,
     },
   });
@@ -63,7 +66,6 @@ function init(server) {
         const totalUnread = parseInt(rows[0].total, 10);
         io.to(`user:${userId}`).emit('unreadTotalUpdated', { total: totalUnread });
       } catch (error) {
-        console.error('Error updating unread_count:', error);
         socket.emit('error', { message: 'Failed to update unread count' });
       }
     });
@@ -96,7 +98,6 @@ function init(server) {
             io.emit('onlineUsers', Array.from(onlineUsers));
           }
         } catch (error) {
-          console.error('Lỗi khi kiểm tra thành viên không kết nối:', error);
         }
       }
     });
@@ -122,7 +123,6 @@ async function isUserInRoom(userId, roomId) {
     }
     return false;
   } catch (error) {
-    console.error('Error checking if user is in room:', error);
     return false;
   }
 }

@@ -62,7 +62,6 @@ async function getUserPosts(req, res) {
 
     res.json(posts);
   } catch (err) {
-    console.error('Error fetching user posts:', err);
     res.status(500).json({ error: 'Đã có lỗi xảy ra khi tải bài viết' });
   }
 }
@@ -111,7 +110,6 @@ async function getUserPostStats(req, res) {
     const result = await pool.query(query, [viewer_id || targetUserId, targetUserId]);
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error fetching user post stats:', err);
     res.status(500).json({ error: 'Đã có lỗi xảy ra khi tải thống kê bài viết' });
   }
 }

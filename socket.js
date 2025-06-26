@@ -3,15 +3,10 @@ const { pool } = require('./db');
 
 let io;
 
-const corsOrigins = (process.env.CORS_ORIGINS || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
-
 function init(server) {
   io = new Server(server, {
     cors: {
-      origin: corsOrigins,
+      origin: ["http://localhost:3000", "https://test-client-a890.onrender.com"],
       credentials: true,
     },
   });

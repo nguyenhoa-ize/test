@@ -27,15 +27,10 @@ const pool = require("./db");
 const app = express();
 dotenv.config();
 
-// CORS cấu hình rõ ràng
-const corsOrigins = (process.env.CORS_ORIGINS || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
-
+// CORS cấu hình
 app.use(
     cors({
-        origin: corsOrigins,
+        origin: ["http://localhost:3000", "https://test-client-a890.onrender.com"],
         credentials: true,
     })
 );

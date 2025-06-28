@@ -147,7 +147,7 @@ exports.googleLogin = async (req, res) => {
         res.cookie("refreshToken", refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            sameSite: "Strict",
+            sameSite: "None",
             maxAge: 15 * 24 * 60 * 60 * 1000, // 15 ngày
             path: "/",
         });
@@ -238,7 +238,7 @@ exports.login = async (req, res) => {
         res.cookie("refreshToken", refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            sameSite: "Strict",
+            sameSite: "None",
             maxAge: 15 * 24 * 60 * 60 * 1000, // 15 ngày
             path: "/",
         });
@@ -309,7 +309,7 @@ exports.signup = async (req, res) => {
         res.cookie("refreshToken", refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            sameSite: "Strict",
+            sameSite: "None",
             maxAge: 15 * 24 * 60 * 60 * 1000, // 15 ngày
             path: "/",
         });
@@ -425,7 +425,7 @@ exports.logout = async (req, res) => {
         res.clearCookie("refreshToken", {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            sameSite: "Strict",
+            sameSite: "None",
             path: "/",
             maxAge: 0,
         });

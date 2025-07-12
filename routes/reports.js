@@ -69,12 +69,17 @@ router.get('/', async (req, res) => {
     }
     const { rows } = await pool.query(query, mainParams);
 
+    // Đảm bảo luôn trả về đủ trường tên user cho mỗi report
     const reports = rows.map((report, index) => ({
       stt: (parseInt(offset, 10) || 0) + index + 1,
       report_id: report.id,
       reporter_id: report.reporter_id,
       reported_user_id: report.reported_user_id,
       date_reported: new Date(report.created_at).toLocaleDateString('en-US'),
+      reporter_first_name: report.reporter_first_name || '',
+      reporter_last_name: report.reporter_last_name || '',
+      reported_first_name: report.reported_first_name || '',
+      reported_last_name: report.reported_last_name || '',
       reported_by: ((report.reporter_first_name || '') + ' ' + (report.reporter_last_name || '')).trim() || 'Không xác định',
       reported_account: ((report.reported_first_name || '') + ' ' + (report.reported_last_name || '')).trim() || 'Không xác định',
       content: report.reason + (report.description ? `: ${report.description}` : ''),
@@ -132,6 +137,12 @@ router.post('/', async (req, res) => {
       reported_user_id,
       reason
     );
+
+    // Emit socket cho admin
+    try {
+      const io = getIO();
+      io.to('admin_room').emit('newReport', { report });
+    } catch (e) { console.error('Socket emit newReport error:', e); }
 
     res.status(201).json({ success: true, report });
   } catch (err) {

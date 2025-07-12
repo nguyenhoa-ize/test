@@ -83,6 +83,10 @@ function init(server) {
       }
     });
 
+    socket.on('joinAdminRoom', () => {
+      socket.join('admin_room');
+    });
+
     socket.on('disconnect', async () => {
       if (userId) {
         socket.leave(`user:${userId}`);
@@ -93,6 +97,7 @@ function init(server) {
             io.emit('onlineUsers', Array.from(onlineUsers));
           }
         } catch (error) {
+          console.error('Lỗi khi kiểm tra thành viên không kết nối:', error);
         }
       }
     });
@@ -118,6 +123,7 @@ async function isUserInRoom(userId, roomId) {
     }
     return false;
   } catch (error) {
+    console.error('Error checking if user is in room:', error);
     return false;
   }
 }

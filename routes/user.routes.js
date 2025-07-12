@@ -4,6 +4,7 @@ const { pool, getClient } = require("../db");
 const { sanitizeInput } = require("../utils/security");
 const { isAuthenticated } = require("../middlewares/auth.middleware");
 const { createFollowNotification } = require("../utils/notification");
+const { getIO } = require("../socket");
 
 // GET /api/users/search
 router.get("/search", isAuthenticated, async (req, res) => {
@@ -121,13 +122,14 @@ router.get("/search", isAuthenticated, async (req, res) => {
             total,
         });
     } catch (error) {
+        console.error("Error fetching users:", error);
         res.status(500).json({ error: "Failed to fetch users" });
     }
 });
 
-// GET /api/users?status=Hoạt động&search=Nguyễn
+// GET /api/users?status=Hoạt động&search=Nguyễn&role=admin
 router.get("/", async (req, res) => {
-    const { status, search, offset = 0, limit = 10 } = req.query;
+    const { status, search, offset = 0, limit = 10, role } = req.query;
     const parsedOffset = Math.max(parseInt(offset, 10) || 0, 0);
     const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
 
@@ -160,6 +162,11 @@ router.get("/", async (req, res) => {
             );
         }
 
+        if (role && ["admin", "user"].includes(role)) {
+            values.push(role);
+            conditions.push(`u.role = $${values.length}`);
+        }
+
         if (conditions.length > 0) {
             baseQuery += ` WHERE ` + conditions.join(" AND ");
         }
@@ -185,6 +192,7 @@ router.get("/", async (req, res) => {
 
         res.json({ users: result.rows, total });
     } catch (error) {
+        console.error("Lỗi khi lấy danh sách người dùng:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -199,8 +207,21 @@ router.put("/:id/status", async (req, res) => {
             is_active,
             id,
         ]);
+        // Lấy lại user mới nhất
+        const userRes = await pool.query(
+            `SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.avatar_url,
+                json_build_object('is_active', ui.is_active, 'created_at', ui.created_at) AS user_info,
+                (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) AS posts_count
+            FROM users u
+            JOIN user_info ui ON u.id = ui.id
+            WHERE u.id = $1`, [id]
+        );
+        const updatedUser = userRes.rows[0];
+        const io = getIO();
+        io.emit('userUpdated', updatedUser);
         res.json({ success: true });
     } catch (error) {
+        console.error("Lỗi khi cập nhật trạng thái:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -217,12 +238,20 @@ router.put("/:id", async (req, res) => {
             [first_name, last_name, email, avatar_url, cover_url, bio, id]
         );
         // Truy vấn lại user mới nhất
-        const updatedUser = await pool.query(
-            `SELECT id, first_name, last_name, email, avatar_url, cover_url, bio FROM users WHERE id = $1`,
-            [id]
+        const userRes = await pool.query(
+            `SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.avatar_url,
+                json_build_object('is_active', ui.is_active, 'created_at', ui.created_at) AS user_info,
+                (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) AS posts_count
+            FROM users u
+            JOIN user_info ui ON u.id = ui.id
+            WHERE u.id = $1`, [id]
         );
-        res.json({ success: true, user: updatedUser.rows[0] });
+        const updatedUser = userRes.rows[0];
+        const io = getIO();
+        io.emit('userUpdated', updatedUser);
+        res.json({ success: true, user: updatedUser });
     } catch (error) {
+        console.error("Lỗi khi cập nhật thông tin người dùng:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -239,8 +268,21 @@ router.put("/:id/role", async (req, res) => {
             role,
             id,
         ]);
-        res.json({ success: true });
+        // Lấy lại user mới nhất
+        const userRes = await pool.query(
+            `SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.avatar_url,
+                json_build_object('is_active', ui.is_active, 'created_at', ui.created_at) AS user_info,
+                (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) AS posts_count
+            FROM users u
+            JOIN user_info ui ON u.id = ui.id
+            WHERE u.id = $1`, [id]
+        );
+        const updatedUser = userRes.rows[0];
+        const io = getIO();
+        io.emit('userUpdated', updatedUser);
+        res.status(200).json({ success: true });
     } catch (error) {
+        console.error("Lỗi khi cập nhật role:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -269,6 +311,7 @@ router.get("/:id/follow-stats", isAuthenticated, async (req, res) => {
 
         res.json(result.rows[0]);
     } catch (error) {
+        console.error("Error getting follow stats:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -295,6 +338,7 @@ router.get("/:id/followers", isAuthenticated, async (req, res) => {
 
         res.json(result.rows);
     } catch (error) {
+        console.error("Error getting followers:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -321,6 +365,7 @@ router.get("/:id/following", isAuthenticated, async (req, res) => {
 
         res.json(result.rows);
     } catch (error) {
+        console.error("Error getting following:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -383,6 +428,7 @@ router.post("/:id/follow", isAuthenticated, async (req, res) => {
         });
     } catch (error) {
         await pool.query("ROLLBACK");
+        console.error("Error following user:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -439,6 +485,7 @@ router.delete("/:id/follow", isAuthenticated, async (req, res) => {
         });
     } catch (error) {
         await pool.query("ROLLBACK");
+        console.error("Error unfollowing user:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -464,6 +511,7 @@ router.get("/:id", async (req, res) => {
 
         res.json(result.rows[0]);
     } catch (error) {
+        console.error("Error fetching user:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -478,6 +526,7 @@ router.get("/:id/post-stats", isAuthenticated, async (req, res) => {
         );
         res.json({ total_posts: parseInt(result.rows[0].total_posts, 10) });
     } catch (error) {
+        console.error("Error getting post stats:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
@@ -502,6 +551,7 @@ router.get("/:id/friends", isAuthenticated, async (req, res) => {
         );
         res.json({ friends: result.rows });
     } catch (err) {
+        console.error("Lỗi khi lấy friends:", err);
         res.status(500).json({ error: "Server error" });
     }
 });

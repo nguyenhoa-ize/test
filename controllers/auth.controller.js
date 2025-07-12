@@ -26,10 +26,14 @@ async function checkUserInfo(userId) {
                 "INSERT INTO user_info (id, is_active) VALUES ($1, $2)",
                 [userId, true]
             );
+            console.log(`Tạo user_info mới cho user_id: ${userId}`);
             return true;
         }
         return userInfo.rows[0].is_active; // Trả về trạng thái is_active
     } catch (error) {
+        console.log(
+            `Lỗi khi xử lý user_info cho user_id ${userId}: ${error.message}`
+        );
         throw error;
     }
 }
@@ -53,8 +57,10 @@ exports.googleLogin = async (req, res) => {
     try {
         // Xác thực ID token với Firebase
         const decoded = await verifyFirebaseToken(idToken);
+        console.log("Decoded ID token:", decoded);
 
         if (!decoded.email) {
+            console.log("ID token không chứa email");
             return res.status(400).json({ error: "ID token không chứa email" });
         }
 
@@ -96,6 +102,7 @@ exports.googleLogin = async (req, res) => {
                     [user.id, true]
                 );
                 is_active = true;
+                console.log(`Người dùng mới đã được tạo: ${user.email}`);
             } else {
                 user = existingUser.rows[0];
                 is_active = existingUser.rows[0].is_active ?? true;
@@ -165,6 +172,7 @@ exports.googleLogin = async (req, res) => {
             accessToken,
         });
     } catch (error) {
+        console.error("Lỗi xác thực Google:", error);
         if (error.message === "Tài khoản bị khóa") {
             return res
                 .status(403)
@@ -257,6 +265,7 @@ exports.login = async (req, res) => {
             accessToken,
         });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: "Lỗi server." });
     }
 };
@@ -270,6 +279,9 @@ exports.signup = async (req, res) => {
         firstName = "",
         lastName = "",
     } = req.body;
+    console.log(
+        `Signup data: email=${email}, firstName=${firstName}, lastName=${lastName}`
+    );
     // Validate
     const errors = [];
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -413,6 +425,7 @@ exports.refreshToken = async (req, res) => {
 // Logout
 exports.logout = async (req, res) => {
     const token = req.cookies.refreshToken;
+    console.log(`Logout token: ${token}`);
     if (!token) return res.status(400).json({ error: "Không có token" });
 
     try {
@@ -432,6 +445,7 @@ exports.logout = async (req, res) => {
 
         res.json({ message: "Đã đăng xuất" });
     } catch (err) {
+        console.error("Lỗi logout:", err);
         res.status(500).json({ error: "Lỗi server." });
     }
 };
@@ -462,6 +476,7 @@ exports.getProfile = async (req, res) => {
             },
         });
     } catch (err) {
+        console.error("Lỗi getProfile:", err);
         res.status(500).json({ error: "Lỗi server" });
     }
 };
@@ -499,11 +514,15 @@ exports.forgotPassword = async (req, res) => {
             [email, token, expires]
         );
 
-        const resetLink = `http://localhost:3000/reset-password?token=${token}`;
+        const resetLink = `https://test-1-m3jk.onrender.com/reset-password?token=${token}`;
 
         try {
             await sendResetEmail(email, resetLink);
         } catch (emailErr) {
+            console.error(
+                "Lỗi gửi email:",
+                emailErr && (emailErr.stack || emailErr.message || emailErr)
+            );
             return res.status(400).json({
                 error: "Không thể gửi email. Có thể địa chỉ email không tồn tại thật hoặc cấu hình gửi mail bị sai. Chi tiết lỗi đã được log ở server.",
             });
@@ -515,6 +534,7 @@ exports.forgotPassword = async (req, res) => {
                 "Nếu email hợp lệ và đã thiết lập mật khẩu, chúng tôi đã gửi hướng dẫn khôi phục.",
         });
     } catch (err) {
+        console.error("LỖI trong forgotPassword:", err);
         res.status(500).json({ error: "Lỗi server", detail: err.message });
     }
 };
@@ -554,6 +574,7 @@ exports.resetPassword = async (req, res) => {
 
         res.json({ message: "Đặt lại mật khẩu thành công." });
     } catch (err) {
+        console.error("resetPassword error:", err);
         res.status(500).json({ error: "Lỗi server" });
     }
 };

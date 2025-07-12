@@ -54,6 +54,7 @@ router.get('/list', async (req, res) => {
     const comments = await pool.query('SELECT * FROM comments WHERE post_id=$1 ORDER BY created_at DESC', [post_id]);
     res.json(comments.rows);
   } catch (error) {
+    console.error('Error fetching comments:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -68,6 +69,7 @@ router.post('/add', async (req, res) => {
     );
     res.json(newComment.rows[0]);
   } catch (error) {
+    console.error('Error adding comment:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

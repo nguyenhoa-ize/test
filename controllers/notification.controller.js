@@ -13,7 +13,7 @@ const emitUnreadTotalUpdate = async (userId) => {
     // Sử dụng room system thay vì userSockets
     io.to(`user:${userId}`).emit('notificationUnreadTotalUpdated', { total: parseInt(count) });
   } catch (err) {
-    // (Xóa tất cả các lệnh console.error trong file này)
+    console.error('Error emitting unread total update:', err);
   }
 };
 
@@ -75,7 +75,8 @@ exports.getNotifications = async (req, res) => {
       hasMore: offset + rows.length < parseInt(count)
     });
   } catch (err) {
-    // (Xóa tất cả các lệnh console.error trong file này)
+    console.error('Error fetching notifications:', err);
+    res.status(500).json({ error: 'Lỗi server', detail: err.message });
   }
 };
 

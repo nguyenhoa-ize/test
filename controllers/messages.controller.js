@@ -56,6 +56,8 @@ exports.getConversationDetails = async (req, res) => {
   const userId = req.user.id;
   const { conversationId } = req.params;
 
+  console.log("Conversation ID: ", conversationId)
+
   try {
     const { rows } = await pool.query(`
       SELECT
@@ -101,6 +103,7 @@ exports.getConversationDetails = async (req, res) => {
     const conversation = processConversationRow(rows[0]);
     return res.status(200).json(conversation);
   } catch (error) {
+    console.error('Lỗi khi lấy chi tiết cuộc hội thoại:', error);
     return res.status(500).json({ message: 'Lỗi máy chủ' });
   }
 };
@@ -198,6 +201,7 @@ exports.getAllConversations = async (req, res) => {
       total: parseInt(count),
     });
   } catch (error) {
+    console.error('Lỗi khi lấy danh sách hội thoại:', error);
     return res.status(500).json({ message: 'Lỗi máy chủ' });
   }
 };
@@ -268,7 +272,8 @@ exports.getMessages = async (req, res) => {
 
     res.json(processedMessages);
   } catch (error) {
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Error getting messages:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -439,6 +444,7 @@ exports.createConversation = async (req, res) => {
       });
     }
   } catch (error) {
+    console.error('Lỗi tạo hội thoại:', error);
     return res.status(500).json({ error: 'Lỗi server', details: error.message });
   }
 };
@@ -572,7 +578,8 @@ exports.sendMessage = async (req, res) => {
     if (error.status === 403) {
       return res.status(403).json({ error: error.message });
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Error sending message:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -582,6 +589,7 @@ exports.getUnreadTotal = async (req, res) => {
     const total = await getUnreadTotal(userId);
     res.json({ total });
   } catch (error) {
-    return res.status(500).json({ error: 'Failed to fetch unread total' });
+    console.error('Error fetching unread total:', error);
+    res.status(500).json({ error: 'Failed to fetch unread total' });
   }
 };

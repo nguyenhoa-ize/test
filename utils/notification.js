@@ -38,6 +38,7 @@ exports.createNotification = async (
 
     return notification;
   } catch (error) {
+    console.error('Error creating notification:', error);
     throw error;
   }
 };
@@ -137,6 +138,7 @@ exports.createPostForFollowersNotification = async (postId, postAuthorId) => {
     const authorRes = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [postAuthorId]);
     const author = authorRes.rows[0];
     if (!author) {
+      console.warn(`Không tìm thấy bài viết ${postAuthorId}. Không thể gửi thông báo đến followers.`);
       return;
     }
 

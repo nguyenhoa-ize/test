@@ -10,6 +10,7 @@ router.get('/', async (req, res) => {
         );
         res.json(result.rows);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -24,6 +25,7 @@ router.post('/', async (req, res) => {
         );
         res.json(result.rows[0]);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -38,6 +40,7 @@ router.get('/room/:roomId', async (req, res) => {
         );
         res.json(result.rows);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

@@ -6,7 +6,7 @@ const rateLimit = require('express-rate-limit');
 // Rate limit: 5 request/phút/user
 const chatLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 200,
+  max: 100,
   message: 'Quá nhiều request, vui lòng thử lại sau'
 });
 

@@ -514,7 +514,7 @@ exports.forgotPassword = async (req, res) => {
             [email, token, expires]
         );
 
-        const resetLink = `https://test-1-m3jk.onrender.com/api/auth/reset-password?token=${token}`;
+        const resetLink = `https://test-client-a890.onrender.com/reset-password?token=${token}`;
 
         try {
             await sendResetEmail(email, resetLink);
